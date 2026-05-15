@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -19,14 +20,16 @@ async def save_session(
 ) -> Session:
     session = await load_session(session_id, db)
 
+    safe_state = json.loads(json.dumps(messages, default=str))
+
     if session is not None:
-        session.conversation_state = messages
+        session.conversation_state = safe_state
         session.appointment_state = appointment_state
         session.updated_at = datetime.now(timezone.utc)
     else:
         session = Session(
             id=session_id,
-            conversation_state=messages,
+            conversation_state=safe_state,
             appointment_state=appointment_state,
         )
         db.add(session)

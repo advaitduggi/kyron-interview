@@ -96,6 +96,30 @@ def extract_text(response: anthropic.types.Message) -> str:
     return ""
 
 
+def _serialize_messages(messages: list) -> list:
+    """Convert any Anthropic SDK objects in a messages list to plain dicts.
+
+    The SDK returns typed objects (TextBlock, ToolUseBlock, etc.) for assistant
+    content blocks. These are not JSON-serialisable, so we must flatten them
+    before writing conversation_state to the database.
+    """
+    result = []
+    for msg in messages:
+        if isinstance(msg.get("content"), list):
+            content = []
+            for block in msg["content"]:
+                if hasattr(block, "model_dump"):
+                    content.append(block.model_dump())
+                elif hasattr(block, "__dict__"):
+                    content.append(vars(block))
+                else:
+                    content.append(block)
+            result.append({"role": msg["role"], "content": content})
+        else:
+            result.append(msg)
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Agentic loop
 # ---------------------------------------------------------------------------
@@ -132,6 +156,7 @@ async def run_turn(messages: list[dict], db: AsyncSession) -> str:
         if response.stop_reason == "end_turn":
             # Persist the final assistant message before returning.
             messages.append({"role": "assistant", "content": response.content})
+            messages[:] = _serialize_messages(messages)
             return extract_text(response)
 
         if response.stop_reason == "tool_use":
@@ -144,4 +169,5 @@ async def run_turn(messages: list[dict], db: AsyncSession) -> str:
 
         # Unexpected stop reason (e.g. "max_tokens") — surface whatever text exists.
         messages.append({"role": "assistant", "content": response.content})
+        messages[:] = _serialize_messages(messages)
         return extract_text(response)
