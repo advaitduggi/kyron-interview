@@ -121,7 +121,11 @@ async def chat(
     messages.append({"role": "user", "content": body.message})
 
     # Run the agentic loop (mutates messages in-place)
-    reply = await ai.run_turn(messages, db)
+    try:
+        reply = await ai.run_turn(messages, db)
+    except Exception:
+        logger.exception("run_turn failed; messages sent to API: %s", json.dumps(messages, default=str)[:2000])
+        raise
 
     # Persist updated session
     await save_session(

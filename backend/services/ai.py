@@ -1,3 +1,4 @@
+import json
 import os
 from typing import Any
 
@@ -74,11 +75,17 @@ async def _execute_tools(
             except Exception as exc:  # noqa: BLE001
                 tool_result = {"error": str(exc)}
 
+        # tool_result content must be a string — serialize dicts/lists to JSON.
+        if isinstance(tool_result, (dict, list)):
+            content_str = json.dumps(tool_result)
+        else:
+            content_str = str(tool_result)
+
         results.append(
             {
                 "type": "tool_result",
                 "tool_use_id": block.id,
-                "content": str(tool_result) if not isinstance(tool_result, (dict, list)) else tool_result,
+                "content": content_str,
             }
         )
     return results
