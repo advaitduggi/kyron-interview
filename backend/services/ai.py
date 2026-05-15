@@ -38,6 +38,9 @@ Safety rules:
 - If a patient describes an emergency, immediately tell them to call 911 or go to the ER.
 - Do not speculate about diagnoses.
 - Keep responses concise and professional.
+
+Formatting:
+- Do not use markdown formatting in your responses. No bold, no italics, no bullet points with asterisks, no headers. Write in plain conversational prose only.
 """
 
 
