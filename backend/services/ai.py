@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import date
 from typing import Any
 
 import anthropic
@@ -13,8 +14,10 @@ from tools import book_appointment, get_availability, get_provider_info, lookup_
 
 MODEL = "claude-sonnet-4-20250514"
 
-SYSTEM_PROMPT = """
+_SYSTEM_PROMPT_TEMPLATE = """
 You are a helpful assistant for a medical practice. You are NOT a doctor and cannot provide medical advice, diagnoses, or treatment recommendations.
+
+Today's date is {today}.
 
 Your job is to help patients with:
 1. Scheduling appointments with the right doctor
@@ -26,6 +29,7 @@ Workflow:
 - Ask what they'd like help with today.
 - If scheduling: ask which body part or condition they want treated, then use get_availability to find open slots.
 - Always use tools to check real availability — never guess or make up time slots.
+- When calling get_availability, use ISO 8601 date strings (YYYY-MM-DD) for date_range_start and date_range_end.
 - Confirm all details with the patient before calling book_appointment.
 - After booking, offer to send a confirmation email and (if they opt in) an SMS reminder.
 
@@ -35,6 +39,10 @@ Safety rules:
 - Do not speculate about diagnoses.
 - Keep responses concise and professional.
 """
+
+
+def _system_prompt() -> str:
+    return _SYSTEM_PROMPT_TEMPLATE.format(today=date.today().isoformat())
 
 ALL_TOOL_DEFINITIONS: list[dict] = [
     get_availability.TOOL_DEFINITION,
@@ -159,7 +167,7 @@ async def run_turn(messages: list[dict], db: AsyncSession) -> str:
         response = await client.messages.create(
             model=MODEL,
             max_tokens=1024,
-            system=SYSTEM_PROMPT,
+            system=_system_prompt(),
             tools=ALL_TOOL_DEFINITIONS,
             messages=messages,
         )
