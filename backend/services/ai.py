@@ -109,11 +109,15 @@ def _serialize_messages(messages: list) -> list:
             content = []
             for block in msg["content"]:
                 if hasattr(block, "model_dump"):
-                    content.append(block.model_dump())
+                    d = block.model_dump()
                 elif hasattr(block, "__dict__"):
-                    content.append(vars(block))
+                    d = vars(block)
                 else:
-                    content.append(block)
+                    d = block
+                # Strip None values — the API rejects fields like citations=null on replay.
+                if isinstance(d, dict):
+                    d = {k: v for k, v in d.items() if v is not None}
+                content.append(d)
             result.append({"role": msg["role"], "content": content})
         else:
             result.append(msg)

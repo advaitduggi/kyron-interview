@@ -80,8 +80,19 @@ async def chat(
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # Reconstruct mutable message list from persisted state
-    messages: list = list(session.conversation_state or [])
+    # Reconstruct mutable message list from persisted state, stripping any
+    # None-valued fields that the Anthropic API rejects on replay.
+    messages: list = [
+        {
+            "role": m["role"],
+            "content": (
+                [{k: v for k, v in b.items() if v is not None} for b in m["content"]]
+                if isinstance(m.get("content"), list)
+                else m["content"]
+            ),
+        }
+        for m in (session.conversation_state or [])
+    ]
     appointment_state: dict = dict(session.appointment_state or {})
 
     # On the first turn of a session, inject the patient info that was already
