@@ -58,7 +58,7 @@ def _generate_slots(provider_id: str, start: date) -> list[Availability]:
     current = start
     days_added = 0
     while days_added < SEED_DAYS:
-        if current.weekday() < 5:  # Mon=0 … Fri=4
+        if current.weekday() not in (5, 6):  # skip Saturday=5, Sunday=6
             for hour in SLOT_HOURS:
                 slot_time = datetime(
                     current.year, current.month, current.day,
