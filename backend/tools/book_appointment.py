@@ -68,48 +68,44 @@ async def execute(args: dict, db: AsyncSession) -> dict:
         slot_id: str = args["slot_id"]
         reason: str = args["reason"]
 
-        async with db.begin():
-            # Lock the slot row so concurrent bookings queue here instead of racing.
-            lock_stmt = (
-                select(Availability)
-                .where(Availability.id == slot_id)
-                .with_for_update()
-            )
-            slot = (await db.execute(lock_stmt)).scalar_one_or_none()
+        # Use the caller's existing session transaction — do NOT call db.begin()
+        # here because the chat router's get_db session already has an open
+        # transaction (autobegin fired on the first SELECT in load_session).
+        # with_for_update() is also omitted: SQLite doesn't support it, and
+        # the single-writer session lock is sufficient for the dev environment.
+        slot_stmt = select(Availability).where(Availability.id == slot_id)
+        slot = (await db.execute(slot_stmt)).scalar_one_or_none()
 
-            if slot is None:
-                return {"error": "slot_not_found", "message": "The requested slot does not exist."}
+        if slot is None:
+            return {"error": "slot_not_found", "message": "The requested slot does not exist."}
 
-            if slot.is_booked:
-                # Slot was taken between the AI offering it and the patient confirming.
-                # Fetch alternatives outside the current transaction so we don't hold the lock.
-                next_slots = await _next_available(db, slot.provider_id, slot.slot_time)
-                return {
-                    "error": "slot_taken",
-                    "message": "That slot was just booked by someone else.",
-                    "next_available": next_slots,
-                }
+        if slot.is_booked:
+            next_slots = await _next_available(db, slot.provider_id, slot.slot_time)
+            return {
+                "error": "slot_taken",
+                "message": "That slot was just booked by someone else.",
+                "next_available": next_slots,
+            }
 
-            # Mark slot as booked and create the appointment.
-            slot.is_booked = True
+        # Mark slot as booked and create the appointment.
+        slot.is_booked = True
 
-            appointment = Appointment(
-                patient_id=patient_id,
-                provider_id=slot.provider_id,
-                slot_time=slot.slot_time,
-                reason=reason,
-                status="confirmed",
-            )
-            db.add(appointment)
-            await db.flush()  # materialise appointment.id before commit
+        appointment = Appointment(
+            patient_id=patient_id,
+            provider_id=slot.provider_id,
+            slot_time=slot.slot_time,
+            reason=reason,
+            status="confirmed",
+        )
+        db.add(appointment)
+        await db.flush()  # materialise appointment.id; commit happens in save_session
 
-            provider_stmt = select(Provider).where(Provider.id == slot.provider_id)
-            provider = (await db.execute(provider_stmt)).scalar_one_or_none()
-            provider_name = provider.name if provider else "Unknown Provider"
+        provider_stmt = select(Provider).where(Provider.id == slot.provider_id)
+        provider = (await db.execute(provider_stmt)).scalar_one_or_none()
+        provider_name = provider.name if provider else "Unknown Provider"
 
-            confirmation = _confirmation_number(appointment.id)
+        confirmation = _confirmation_number(appointment.id)
 
-        # Transaction committed — safe to return
         return {
             "appointment_id": appointment.id,
             "provider_name": provider_name,
