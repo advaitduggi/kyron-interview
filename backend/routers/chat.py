@@ -84,6 +84,28 @@ async def chat(
     messages: list = list(session.conversation_state or [])
     appointment_state: dict = dict(session.appointment_state or {})
 
+    # On the first turn of a session, inject the patient info that was already
+    # collected by the intake form so the AI doesn't ask for it again.
+    if not messages and body.patient_id:
+        result = await db.execute(select(Patient).where(Patient.id == body.patient_id))
+        known_patient = result.scalar_one_or_none()
+        if known_patient:
+            messages.append({
+                "role": "user",
+                "content": (
+                    f"[Patient info on file — Name: {known_patient.first_name} {known_patient.last_name}, "
+                    f"DOB: {known_patient.dob}, Phone: {known_patient.phone}, "
+                    f"Email: {known_patient.email}]"
+                ),
+            })
+            messages.append({
+                "role": "assistant",
+                "content": (
+                    f"Thank you, {known_patient.first_name}. I have your information on file. "
+                    "How can I help you today?"
+                ),
+            })
+
     # Append the new user turn
     messages.append({"role": "user", "content": body.message})
 
