@@ -795,8 +795,21 @@ input, textarea { font-family: var(--sans); }
   transition: background 0.2s;
 }
 .slot-dot-open   { background: var(--sage); }
-.slot-dot-booked { background: rgba(44,44,44,0.2); }
+.slot-dot-booked { background: #d32f2f; }
 .slot-label { font-size: 0.75rem; color: var(--muted); }
+.slot-label--booked { color: #d32f2f; }
+.slot-item--booked { background: #fdf3f3; }
+.slot-item--booked:hover { background: #fce8e8; }
+.slot-action {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: auto;
+  padding-left: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.14s;
+}
+.slot-item:hover .slot-action { opacity: 1; }
 
 /* admin content top bar */
 .admin-content-top {

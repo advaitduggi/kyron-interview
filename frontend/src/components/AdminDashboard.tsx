@@ -96,7 +96,7 @@ function DateGroup({ dateLabel, slots, defaultOpen, onToggle }: DateGroupProps) 
           {slots.map((s) => (
             <li
               key={s.id}
-              className="slot-item"
+              className={`slot-item${s.is_booked ? " slot-item--booked" : ""}`}
               onClick={() => onToggle(s.id, s.is_booked)}
               role="button"
               tabIndex={0}
@@ -106,13 +106,18 @@ function DateGroup({ dateLabel, slots, defaultOpen, onToggle }: DateGroupProps) 
                   onToggle(s.id, s.is_booked);
                 }
               }}
-              aria-label={`${formatSlotTime(s.slot_time)} — ${s.is_booked ? "Blocked" : "Available"}`}
+              aria-label={`${formatSlotTime(s.slot_time)} — ${s.is_booked ? "Booked" : "Available"}`}
             >
               <span className="slot-item-left">
                 <span className={`slot-dot ${s.is_booked ? "slot-dot-booked" : "slot-dot-open"}`} />
                 {formatSlotTime(s.slot_time)}
               </span>
-              <span className="slot-label">{s.is_booked ? "Blocked" : "Available"}</span>
+              <span className={`slot-label${s.is_booked ? " slot-label--booked" : ""}`}>
+                {s.is_booked ? "Booked" : "Available"}
+              </span>
+              <span className="slot-action">
+                {s.is_booked ? "Unblock" : "Block"}
+              </span>
             </li>
           ))}
         </ul>
@@ -142,6 +147,12 @@ export default function AdminDashboard() {
     const t = setTimeout(() => setToast(null), 2000);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    if (!authed) return;
+    const interval = setInterval(fetchProviders, 30000);
+    return () => clearInterval(interval);
+  }, [authed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchProviders() {
     setLoading(true);
