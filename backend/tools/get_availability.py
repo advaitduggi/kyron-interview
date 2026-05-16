@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,6 +37,8 @@ TOOL_DEFINITION = {
         "required": ["date_range_start", "date_range_end"],
     },
 }
+
+EASTERN = timezone(timedelta(hours=-4))  # EDT
 
 _MAX_RESULTS = 10
 # Fetch more rows than needed so Python-side body_part filtering has enough to
@@ -87,7 +89,7 @@ async def execute(args: dict, db: AsyncSession) -> dict:
             "provider_id": avail.provider_id,
             "provider_name": provider.name,
             "specialty": provider.specialty,
-            "slot_time": avail.slot_time.isoformat(),
+            "slot_time": avail.slot_time.astimezone(EASTERN).strftime("%A, %B %-d at %-I:%M %p ET"),
         }
         for avail, provider in rows[:_MAX_RESULTS]
     ]
