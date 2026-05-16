@@ -51,6 +51,18 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 // ── API surface ────────────────────────────────────────────────────
 
+export interface SessionState {
+  id: string;
+  patient_id: string | null;
+  conversation_state: unknown[];
+  appointment_state: Record<string, unknown>;
+  updated_at: string;
+}
+
+export function getSession(sessionId: string): Promise<SessionState> {
+  return req<SessionState>(`/sessions/${sessionId}`);
+}
+
 export function intakeSubmit(data: IntakeData): Promise<IntakeResponse> {
   return req<IntakeResponse>("/intake", {
     method: "POST",

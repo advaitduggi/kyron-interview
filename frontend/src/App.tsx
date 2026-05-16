@@ -1,18 +1,36 @@
 import { useEffect, useState } from "react";
 import { useSession } from "./hooks/useSession";
+import { getSession } from "./lib/api";
 import ErrorBoundary from "./components/ErrorBoundary";
 import IntakeForm from "./components/IntakeForm";
 import ChatWindow from "./components/ChatWindow";
 import AdminDashboard from "./components/AdminDashboard";
 
 export default function App() {
-  const { sessionId, patientId, saveSession } = useSession();
+  const { sessionId, patientId, saveSession, clearSession } = useSession();
   const [isAdmin, setIsAdmin] = useState(() => window.location.hash === "#admin");
+  // null = still validating, true = valid, false = invalid/expired
+  const [sessionValid, setSessionValid] = useState<boolean | null>(
+    sessionId ? null : true
+  );
 
   useEffect(() => {
     const onHash = () => setIsAdmin(window.location.hash === "#admin");
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  // Validate the stored session against the server on mount.
+  // If the DB was wiped or the session expired, clear localStorage and show intake.
+  useEffect(() => {
+    if (!sessionId) return;
+    getSession(sessionId)
+      .then(() => setSessionValid(true))
+      .catch(() => {
+        clearSession();
+        setSessionValid(false);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (isAdmin) {
@@ -25,7 +43,12 @@ export default function App() {
     );
   }
 
-  if (!sessionId || !patientId) {
+  // Still pinging the server to check if the cached session is alive
+  if (sessionValid === null) {
+    return null;
+  }
+
+  if (!sessionId || !patientId || !sessionValid) {
     return (
       <div className="app-fade" style={{ height: "100%" }}>
         <ErrorBoundary>

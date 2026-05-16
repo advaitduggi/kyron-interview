@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Patient, get_db
-from db.schemas import ChatRequest, ChatResponse, IntakeRequest, IntakeResponse
+from db.schemas import ChatRequest, ChatResponse, IntakeRequest, IntakeResponse, SessionOut
 from services import ai, notifications
 from services.session import create_session, load_session, save_session
 
@@ -39,6 +39,18 @@ def _find_booking_result(messages: list) -> dict | None:
             if isinstance(result, dict) and "appointment_id" in result:
                 return result
     return None
+
+
+# ---------------------------------------------------------------------------
+# GET /sessions/{session_id}
+# ---------------------------------------------------------------------------
+
+@router.get("/sessions/{session_id}", response_model=SessionOut)
+async def get_session(session_id: str, db: AsyncSession = Depends(get_db)) -> SessionOut:
+    session = await load_session(session_id, db)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
 
 
 # ---------------------------------------------------------------------------
