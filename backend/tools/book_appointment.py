@@ -1,4 +1,5 @@
 import logging
+import re
 import traceback
 from datetime import datetime, timedelta, timezone
 
@@ -8,6 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import Appointment, Availability, Provider
 
 logger = logging.getLogger(__name__)
+
+_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I
+)
 
 TOOL_DEFINITION = {
     "name": "book_appointment",
@@ -67,6 +72,13 @@ async def execute(args: dict, db: AsyncSession) -> dict:
         patient_id: str = args["patient_id"]
         slot_id: str = args["slot_id"]
         reason: str = args["reason"]
+
+        if not _UUID_RE.match(str(patient_id)):
+            logger.error("book_appointment: invalid patient_id format: %r", patient_id)
+            return {
+                "error": f"Invalid patient_id format: {patient_id!r} — must be a UUID. "
+                         "Use the patient_id from the [SYSTEM:] context message."
+            }
 
         # Use the caller's existing session transaction — do NOT call db.begin()
         # here because the chat router's get_db session already has an open

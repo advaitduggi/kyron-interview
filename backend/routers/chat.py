@@ -118,6 +118,9 @@ async def chat(
 
     # On the first turn of a session, inject the patient info that was already
     # collected by the intake form so the AI doesn't ask for it again.
+    # The real patient UUID is included explicitly so the AI never has to guess
+    # or construct a patient_id — hallucinated IDs (e.g. "name-YYYY-MM-DD")
+    # caused FK violations when calling book_appointment.
     if not messages and body.patient_id:
         result = await db.execute(select(Patient).where(Patient.id == body.patient_id))
         known_patient = result.scalar_one_or_none()
@@ -125,8 +128,10 @@ async def chat(
             messages.append({
                 "role": "user",
                 "content": (
-                    f"[Patient info on file — Name: {known_patient.first_name} {known_patient.last_name}, "
-                    f"DOB: {known_patient.dob}, Phone: {known_patient.phone}, "
+                    f"[SYSTEM: Patient info on file — "
+                    f"patient_id (UUID, use this exactly when calling book_appointment): {known_patient.id} | "
+                    f"Name: {known_patient.first_name} {known_patient.last_name} | "
+                    f"DOB: {known_patient.dob} | Phone: {known_patient.phone} | "
                     f"Email: {known_patient.email}]"
                 ),
             })
@@ -137,6 +142,31 @@ async def chat(
                     "How can I help you today?"
                 ),
             })
+    elif messages and body.patient_id:
+        # On subsequent turns: ensure the system context message is present.
+        # If the first message doesn't already have the [SYSTEM: block, prepend it.
+        first_content = messages[0].get("content", "") if messages else ""
+        if not (isinstance(first_content, str) and first_content.startswith("[SYSTEM:")):
+            result = await db.execute(select(Patient).where(Patient.id == body.patient_id))
+            known_patient = result.scalar_one_or_none()
+            if known_patient:
+                messages.insert(0, {
+                    "role": "user",
+                    "content": (
+                        f"[SYSTEM: Patient info on file — "
+                        f"patient_id (UUID, use this exactly when calling book_appointment): {known_patient.id} | "
+                        f"Name: {known_patient.first_name} {known_patient.last_name} | "
+                        f"DOB: {known_patient.dob} | Phone: {known_patient.phone} | "
+                        f"Email: {known_patient.email}]"
+                    ),
+                })
+                messages.insert(1, {
+                    "role": "assistant",
+                    "content": (
+                        f"Thank you, {known_patient.first_name}. I have your information on file. "
+                        "How can I help you today?"
+                    ),
+                })
 
     # Append the new user turn
     messages.append({"role": "user", "content": body.message})
