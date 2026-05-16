@@ -127,7 +127,7 @@ export async function adminToggleSlot(
 ): Promise<void> {
   await req(`/admin/providers/${provider_id}/availability/${slot_id}`, {
     method: "PATCH",
-    headers: { "X-Admin-Secret": secret },
+    headers: { "Content-Type": "application/json", "X-Admin-Secret": secret },
     body: JSON.stringify({ is_booked }),
   });
 }
