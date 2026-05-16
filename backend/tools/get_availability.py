@@ -8,8 +8,9 @@ from db.models import Availability, Provider
 TOOL_DEFINITION = {
     "name": "get_availability",
     "description": (
-        "Query open appointment slots. Filter by provider and/or body part. "
-        "Always call this tool — never guess or invent time slots."
+        "Get real-time availability from the database. "
+        "Always call this fresh — never use previously retrieved slots as they may be outdated. "
+        "Call this again any time the patient asks about available times, other slots, or updated availability."
     ),
     "input_schema": {
         "type": "object",
