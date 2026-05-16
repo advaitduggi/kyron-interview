@@ -92,6 +92,15 @@ async def chat(
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    # Validate patient_id exists in the DB to prevent FK violations from stale
+    # localStorage values that predate a DB wipe.
+    if body.patient_id:
+        patient_check = await db.execute(
+            select(Patient).where(Patient.id == body.patient_id)
+        )
+        if patient_check.scalar_one_or_none() is None:
+            raise HTTPException(status_code=404, detail="Patient not found")
+
     # Reconstruct mutable message list from persisted state, stripping any
     # None-valued fields that the Anthropic API rejects on replay.
     messages: list = [
