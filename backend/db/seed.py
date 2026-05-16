@@ -49,7 +49,7 @@ PROVIDERS = [
     },
 ]
 
-SLOT_HOURS = [9, 10, 11, 14, 15, 16]  # 9am–11am, 2pm–4pm
+SLOT_HOURS = [13, 14, 15, 18, 19, 20]  # 9am–11am, 2pm–4pm EDT (UTC-4)
 SEED_DAYS = 45
 
 
