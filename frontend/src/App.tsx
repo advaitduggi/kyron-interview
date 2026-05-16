@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { useSession } from "./hooks/useSession";
 import { getSession } from "./lib/api";
+
+const isValidUUID = (id: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 import ErrorBoundary from "./components/ErrorBoundary";
 import IntakeForm from "./components/IntakeForm";
 import ChatWindow from "./components/ChatWindow";
@@ -21,9 +24,16 @@ export default function App() {
   }, []);
 
   // Validate the stored session against the server on mount.
-  // If the DB was wiped or the session expired, clear localStorage and show intake.
+  // Also check that patientId is a well-formed UUID — a non-UUID value (e.g.
+  // a process PID that leaked into localStorage) would cause FK violations.
+  // Clear and drop to intake on any validation failure.
   useEffect(() => {
     if (!sessionId) return;
+    if (patientId && !isValidUUID(patientId)) {
+      clearSession();
+      setSessionValid(false);
+      return;
+    }
     getSession(sessionId)
       .then(() => setSessionValid(true))
       .catch(() => {
