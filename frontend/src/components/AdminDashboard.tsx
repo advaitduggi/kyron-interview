@@ -1,14 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { adminGetProviders, adminToggleSlot, type Provider } from "../lib/api";
 
 function formatSlotTime(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleString([], {
+  return d.toLocaleString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
+    hour12: true,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
 }
 
@@ -36,7 +38,8 @@ export default function AdminDashboard() {
   const [loading, setLoading]     = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [toast, setToast]         = useState<string | null>(null);
-  const secretRef = useState(secret)[0]; // stable ref for callbacks
+  const secretRef = useRef(secret);
+  useEffect(() => { secretRef.current = secret; }, [secret]);
 
   // dismiss toast after 2 s
   useEffect(() => {
@@ -77,7 +80,7 @@ export default function AdminDashboard() {
         )
       );
       try {
-        await adminToggleSlot(provider.id, slotId, newBooked, secretRef);
+        await adminToggleSlot(provider.id, slotId, newBooked, secretRef.current);
         setToast(newBooked ? "Slot blocked" : "Slot opened");
       } catch {
         // Revert on failure
