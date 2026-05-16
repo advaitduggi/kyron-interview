@@ -1,4 +1,5 @@
 import os
+import re
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +14,15 @@ from services.session import load_session
 router = APIRouter()
 
 VAPI_CALL_URL = "https://api.vapi.ai/call/phone"
+
+
+def normalize_phone(phone: str) -> str:
+    digits = re.sub(r'\D', '', phone)
+    if len(digits) == 10:
+        return f"+1{digits}"
+    if len(digits) == 11 and digits.startswith('1'):
+        return f"+{digits}"
+    return f"+{digits}"
 
 
 class CallRequest(BaseModel):
@@ -68,7 +78,7 @@ async def initiate_call(body: CallRequest, db: AsyncSession = Depends(get_db)) -
 
     payload = {
         "phoneNumberId": phone_number_id,
-        "customer": {"number": patient.phone},
+        "customer": {"number": normalize_phone(patient.phone)},
         "assistant": {
             "model": {
                 "provider": "anthropic",
