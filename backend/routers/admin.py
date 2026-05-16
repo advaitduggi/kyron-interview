@@ -1,13 +1,17 @@
 import os
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Availability, Provider, get_db
-from db.schemas import AvailabilityToggle
 
 router = APIRouter(prefix="/admin")
+
+
+class ToggleBody(BaseModel):
+    is_booked: bool
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +67,7 @@ async def list_providers(db: AsyncSession = Depends(get_db)) -> dict:
 async def toggle_slot(
     provider_id: str,
     slot_id: str,
-    body: AvailabilityToggle,
+    body: ToggleBody,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     result = await db.execute(
