@@ -1,11 +1,12 @@
 import os
+from datetime import datetime  # noqa: F401 — used by _naive type hint
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import Availability, Provider, get_db
+from db.models import Appointment, Availability, Patient, Provider, get_db
 
 router = APIRouter(prefix="/admin")
 
@@ -35,30 +36,40 @@ def _confirmation_number(appointment_id: str) -> str:
     return _CONFIRMATION_PREFIX + appointment_id.replace("-", "")[:8].upper()
 
 
+def _naive(dt) -> "datetime":
+    """Strip timezone info so SQLite naive and aware datetimes compare equal."""
+    return dt.replace(tzinfo=None) if dt else dt
+
+
 @router.get("/providers", dependencies=[Depends(require_admin)])
 async def list_providers(db: AsyncSession = Depends(get_db)) -> dict:
-    result = await db.execute(select(Provider))
-    providers = result.scalars().all()
+    providers_result = await db.execute(select(Provider))
+    providers = providers_result.scalars().all()
 
-    # Provider.availability and Provider.appointments are lazy="selectin" — already loaded.
-    # Build a slot_time -> appointment map for each provider to annotate booked slots.
+    # Fetch all confirmed appointments with their patients in one query.
+    appts_result = await db.execute(
+        select(Appointment, Patient)
+        .join(Patient, Appointment.patient_id == Patient.id)
+        .where(Appointment.status == "confirmed")
+    )
+    # Key: (provider_id, naive slot_time) -> (Appointment, Patient)
+    appt_map: dict[tuple, tuple] = {}
+    for appt, patient in appts_result.all():
+        appt_map[(_naive(appt.slot_time), appt.provider_id)] = (appt, patient)
+
     provider_list = []
     for p in providers:
-        appt_by_slot: dict = {}
-        for appt in (p.appointments or []):
-            if appt.status == "confirmed" and appt.patient:
-                appt_by_slot[appt.slot_time] = appt
-
         slots = []
         for slot in sorted(p.availability, key=lambda s: s.slot_time):
-            appt = appt_by_slot.get(slot.slot_time) if slot.is_booked else None
+            pair = appt_map.get((_naive(slot.slot_time), p.id)) if slot.is_booked else None
+            appt, patient = pair if pair else (None, None)
             entry: dict = {
                 "id": slot.id,
                 "slot_time": slot.slot_time.isoformat(),
                 "is_booked": slot.is_booked,
                 "appointment_id": _confirmation_number(appt.id) if appt else None,
-                "patient_name": f"{appt.patient.first_name} {appt.patient.last_name}" if appt else None,
-                "patient_phone": appt.patient.phone if appt else None,
+                "patient_name": f"{patient.first_name} {patient.last_name}" if patient else None,
+                "patient_phone": patient.phone if patient else None,
                 "reason": appt.reason if appt else None,
             }
             slots.append(entry)
