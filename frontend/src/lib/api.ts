@@ -113,6 +113,18 @@ export async function* sendMessage(
   }
 }
 
+export interface CallResponse {
+  call_id: string;
+  status: string;
+}
+
+export function initiateCall(session_id: string, patient_id: string): Promise<CallResponse> {
+  return req<CallResponse>("/call", {
+    method: "POST",
+    body: JSON.stringify({ session_id, patient_id }),
+  });
+}
+
 export function adminGetProviders(secret: string): Promise<{ providers: Provider[] }> {
   return req<{ providers: Provider[] }>("/admin/providers", {
     headers: { "X-Admin-Secret": secret },

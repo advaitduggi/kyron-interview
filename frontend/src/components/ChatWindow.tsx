@@ -49,7 +49,7 @@ export default function ChatWindow({ sessionId, patientId, onSessionUpdate }: Pr
       {/* ── Header ── */}
       <header className="chat-header">
         <span className="chat-wordmark">Kyron</span>
-        <VoiceButton />
+        <VoiceButton sessionId={sessionId} patientId={patientId} />
       </header>
 
       {/* ── Messages ── */}

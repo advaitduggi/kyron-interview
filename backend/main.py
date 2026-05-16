@@ -4,7 +4,7 @@ load_dotenv()  # must run before any module that reads os.environ at import time
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import admin, appointments, chat, providers
+from routers import admin, appointments, calls, chat, providers
 
 app = FastAPI(title="Kyron Medical API")
 
@@ -20,3 +20,4 @@ app.include_router(chat.router)
 app.include_router(appointments.router)
 app.include_router(providers.router)
 app.include_router(admin.router)
+app.include_router(calls.router)
