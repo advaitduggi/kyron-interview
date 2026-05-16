@@ -1,16 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { adminGetProviders, adminToggleSlot, type Provider } from "../lib/api";
 
-function formatSlotTime(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+const formatSlotTime = (iso: string) => {
+  return new Date(iso).toLocaleString("en-US", {
+    weekday: "short", month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
   });
 }
 
