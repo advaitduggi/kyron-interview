@@ -1,30 +1,130 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { adminGetProviders, adminToggleSlot, type Provider } from "../lib/api";
+import { adminGetProviders, adminToggleSlot, type Provider, type ProviderSlot } from "../lib/api";
 
-const formatSlotTime = (iso: string) => {
-  return new Date(iso).toLocaleString("en-US", {
-    weekday: "short", month: "short", day: "numeric",
-    hour: "numeric", minute: "2-digit", hour12: true,
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+function formatDateHeader(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric", timeZone: TZ,
+  });
+}
+
+function formatSlotTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric", minute: "2-digit", hour12: true, timeZone: TZ,
+  });
+}
+
+function formatTodayFull() {
+  return new Date().toLocaleDateString("en-US", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
 }
 
 function initials(name: string) {
-  return name
-    .split(" ")
-    .filter((w) => /^[A-Z]/i.test(w))
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join("");
+  return name.split(" ").filter((w) => /^[A-Z]/i.test(w)).slice(0, 2)
+    .map((w) => w[0].toUpperCase()).join("");
 }
 
-function nextSlots(provider: Provider, n = 5) {
-  const now = Date.now();
-  return provider.availability
-    .filter((s) => new Date(s.slot_time).getTime() > now)
-    .sort((a, b) => new Date(a.slot_time).getTime() - new Date(b.slot_time).getTime())
-    .slice(0, n);
+function dateKey(iso: string) {
+  // YYYY-MM-DD in local time for grouping
+  const d = new Date(iso);
+  return [
+    d.toLocaleDateString("en-CA", { timeZone: TZ }), // gives YYYY-MM-DD
+  ][0];
 }
+
+function slotsByDate(provider: Provider, days: number) {
+  const now = Date.now();
+  const cutoff = now + days * 24 * 60 * 60 * 1000;
+  const future = provider.availability.filter((s) => {
+    const t = new Date(s.slot_time).getTime();
+    return t > now && t <= cutoff;
+  });
+  future.sort((a, b) => new Date(a.slot_time).getTime() - new Date(b.slot_time).getTime());
+
+  const grouped = new Map<string, ProviderSlot[]>();
+  for (const slot of future) {
+    const key = dateKey(slot.slot_time);
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key)!.push(slot);
+  }
+  return grouped; // Map<dateKey, slots[]> ordered by date
+}
+
+function countAvailableThisWeek(provider: Provider) {
+  const now = Date.now();
+  const weekEnd = now + 7 * 24 * 60 * 60 * 1000;
+  return provider.availability.filter((s) => {
+    const t = new Date(s.slot_time).getTime();
+    return t > now && t <= weekEnd && !s.is_booked;
+  }).length;
+}
+
+// ── Sub-components ─────────────────────────────────────────────────────────
+
+interface DateGroupProps {
+  dateLabel: string;
+  slots: ProviderSlot[];
+  defaultOpen: boolean;
+  onToggle: (slotId: string, isBooked: boolean) => void;
+}
+
+function DateGroup({ dateLabel, slots, defaultOpen, onToggle }: DateGroupProps) {
+  const [open, setOpen] = useState(defaultOpen);
+  const available = slots.filter((s) => !s.is_booked).length;
+
+  return (
+    <div className="date-group">
+      <button
+        className="date-group-header"
+        onClick={() => setOpen((v) => !v)}
+        type="button"
+        aria-expanded={open}
+      >
+        <span className="date-group-label">{dateLabel}</span>
+        <span className="date-group-meta">
+          {available}/{slots.length} open
+          <span className={`date-group-chevron${open ? " open" : ""}`}>›</span>
+        </span>
+      </button>
+
+      {open && (
+        <ul className="slot-list">
+          {slots.map((s) => (
+            <li
+              key={s.id}
+              className="slot-item"
+              onClick={() => onToggle(s.id, s.is_booked)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onToggle(s.id, s.is_booked);
+                }
+              }}
+              aria-label={`${formatSlotTime(s.slot_time)} — ${s.is_booked ? "Blocked" : "Available"}`}
+            >
+              <span className="slot-item-left">
+                <span className={`slot-dot ${s.is_booked ? "slot-dot-booked" : "slot-dot-open"}`} />
+                {formatSlotTime(s.slot_time)}
+              </span>
+              <span className="slot-label">{s.is_booked ? "Blocked" : "Available"}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
+
+const RANGE_OPTIONS = [7, 14, 30] as const;
+type DayRange = (typeof RANGE_OPTIONS)[number];
 
 export default function AdminDashboard() {
   const [secret, setSecret]       = useState("");
@@ -33,15 +133,27 @@ export default function AdminDashboard() {
   const [loading, setLoading]     = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [toast, setToast]         = useState<string | null>(null);
+  const [dayRange, setDayRange]   = useState<DayRange>(7);
   const secretRef = useRef(secret);
   useEffect(() => { secretRef.current = secret; }, [secret]);
 
-  // dismiss toast after 2 s
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 2000);
     return () => clearTimeout(t);
   }, [toast]);
+
+  async function fetchProviders() {
+    setLoading(true);
+    try {
+      const data = await adminGetProviders(secretRef.current);
+      setProviders(data.providers);
+    } catch {
+      setToast("Refresh failed");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleAuth(e: React.FormEvent) {
     e.preventDefault();
@@ -61,34 +173,28 @@ export default function AdminDashboard() {
   const toggleSlot = useCallback(
     async (provider: Provider, slotId: string, currentBooked: boolean) => {
       const newBooked = !currentBooked;
-      // Optimistic update
       setProviders((prev) =>
         prev.map((p) =>
-          p.id !== provider.id
-            ? p
-            : {
-                ...p,
-                availability: p.availability.map((s) =>
-                  s.id === slotId ? { ...s, is_booked: newBooked } : s
-                ),
-              }
+          p.id !== provider.id ? p : {
+            ...p,
+            availability: p.availability.map((s) =>
+              s.id === slotId ? { ...s, is_booked: newBooked } : s
+            ),
+          }
         )
       );
       try {
         await adminToggleSlot(provider.id, slotId, newBooked, secretRef.current);
         setToast(newBooked ? "Slot blocked" : "Slot opened");
       } catch {
-        // Revert on failure
         setProviders((prev) =>
           prev.map((p) =>
-            p.id !== provider.id
-              ? p
-              : {
-                  ...p,
-                  availability: p.availability.map((s) =>
-                    s.id === slotId ? { ...s, is_booked: currentBooked } : s
-                  ),
-                }
+            p.id !== provider.id ? p : {
+              ...p,
+              availability: p.availability.map((s) =>
+                s.id === slotId ? { ...s, is_booked: currentBooked } : s
+              ),
+            }
           )
         );
         setToast("Update failed — please retry");
@@ -117,11 +223,7 @@ export default function AdminDashboard() {
                 onChange={(e) => setSecret(e.target.value)}
                 autoFocus
               />
-              <button
-                className="admin-auth-btn"
-                type="submit"
-                disabled={loading || !secret}
-              >
+              <button className="admin-auth-btn" type="submit" disabled={loading || !secret}>
                 {loading ? "Verifying…" : "Sign in"}
               </button>
               {authError && <p className="admin-auth-error">{authError}</p>}
@@ -130,10 +232,41 @@ export default function AdminDashboard() {
         </div>
       ) : (
         <div className="admin-content">
-          <h2 className="admin-content-heading">Provider availability</h2>
+          <div className="admin-content-top">
+            <div>
+              <h2 className="admin-content-heading">Provider availability</h2>
+              <p className="admin-today">{formatTodayFull()}</p>
+            </div>
+            <div className="admin-toolbar">
+              <div className="range-toggle">
+                {RANGE_OPTIONS.map((d) => (
+                  <button
+                    key={d}
+                    className={`range-btn${dayRange === d ? " range-btn--active" : ""}`}
+                    onClick={() => setDayRange(d)}
+                    type="button"
+                  >
+                    {d}d
+                  </button>
+                ))}
+              </div>
+              <button
+                className="refresh-btn"
+                onClick={() => void fetchProviders()}
+                disabled={loading}
+                type="button"
+              >
+                {loading ? "…" : "↻ Refresh"}
+              </button>
+            </div>
+          </div>
+
           <div className="provider-grid">
             {providers.map((p) => {
-              const slots = nextSlots(p);
+              const grouped = slotsByDate(p, dayRange);
+              const weekAvail = countAvailableThisWeek(p);
+              const dateKeys = Array.from(grouped.keys());
+
               return (
                 <div key={p.id} className="provider-card">
                   <div className="provider-card-head">
@@ -144,41 +277,29 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  {slots.length === 0 ? (
-                    <p style={{ fontSize: "0.82rem", color: "var(--muted)" }}>
-                      No upcoming slots
-                    </p>
+                  <p className="provider-week-summary">
+                    {weekAvail} available slot{weekAvail !== 1 ? "s" : ""} this week
+                  </p>
+
+                  {dateKeys.length === 0 ? (
+                    <p className="no-slots-msg">No upcoming slots in next {dayRange} days</p>
                   ) : (
-                    <ul className="slot-list">
-                      {slots.map((s) => (
-                        <li
-                          key={s.id}
-                          className="slot-item"
-                          onClick={() => void toggleSlot(p, s.id, s.is_booked)}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              void toggleSlot(p, s.id, s.is_booked);
+                    <div className="date-groups">
+                      {dateKeys.map((key, i) => {
+                        const slots = grouped.get(key)!;
+                        return (
+                          <DateGroup
+                            key={key}
+                            dateLabel={formatDateHeader(slots[0].slot_time)}
+                            slots={slots}
+                            defaultOpen={i === 0}
+                            onToggle={(slotId, isBooked) =>
+                              void toggleSlot(p, slotId, isBooked)
                             }
-                          }}
-                          aria-label={`${formatSlotTime(s.slot_time)} — ${s.is_booked ? "Blocked" : "Available"}`}
-                        >
-                          <span className="slot-item-left">
-                            <span
-                              className={`slot-dot ${
-                                s.is_booked ? "slot-dot-booked" : "slot-dot-open"
-                              }`}
-                            />
-                            {formatSlotTime(s.slot_time)}
-                          </span>
-                          <span className="slot-label">
-                            {s.is_booked ? "Blocked" : "Available"}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                          />
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               );
