@@ -63,11 +63,13 @@ export function getSession(sessionId: string): Promise<SessionState> {
   return req<SessionState>(`/sessions/${sessionId}`);
 }
 
-export function intakeSubmit(data: IntakeData): Promise<IntakeResponse> {
-  return req<IntakeResponse>("/intake", {
+export async function intakeSubmit(data: IntakeData): Promise<IntakeResponse> {
+  const res = await req<IntakeResponse>("/intake", {
     method: "POST",
     body: JSON.stringify(data),
   });
+  console.log("intakeSubmit response:", JSON.stringify(res));
+  return res;
 }
 
 export async function* sendMessage(
