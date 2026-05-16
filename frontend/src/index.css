@@ -787,7 +787,8 @@ input, textarea { font-family: var(--sans); }
   user-select: none;
 }
 .slot-item:hover { background: rgba(27,67,50,0.06); }
-.slot-item-left { display: flex; align-items: center; gap: 8px; color: var(--text); }
+.slot-item-left { display: flex; align-items: flex-start; gap: 8px; color: var(--text); }
+.slot-item-left .slot-dot { margin-top: 4px; }
 .slot-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
@@ -810,6 +811,35 @@ input, textarea { font-family: var(--sans); }
   transition: opacity 0.14s;
 }
 .slot-item:hover .slot-action { opacity: 1; }
+
+.slot-item-body { display: flex; flex-direction: column; gap: 2px; }
+.slot-item-time { font-size: 0.82rem; color: var(--text); }
+.slot-patient-info { display: flex; flex-direction: column; gap: 1px; }
+.slot-patient-name { font-size: 0.78rem; font-weight: 500; color: var(--text); }
+.slot-patient-reason { font-size: 0.75rem; color: var(--muted); }
+.slot-patient-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 1px;
+}
+.slot-patient-phone {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.slot-confirmation {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  background: rgba(211,47,47,0.08);
+  color: #d32f2f;
+  border-radius: var(--pill);
+  letter-spacing: 0.04em;
+}
 
 /* admin content top bar */
 .admin-content-top {

@@ -24,6 +24,10 @@ export interface ProviderSlot {
   id: string;
   slot_time: string;
   is_booked: boolean;
+  appointment_id: string | null;
+  patient_name: string | null;
+  patient_phone: string | null;
+  reason: string | null;
 }
 
 export interface Provider {

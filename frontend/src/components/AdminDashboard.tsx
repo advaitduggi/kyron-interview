@@ -110,10 +110,28 @@ function DateGroup({ dateLabel, slots, defaultOpen, onToggle }: DateGroupProps) 
             >
               <span className="slot-item-left">
                 <span className={`slot-dot ${s.is_booked ? "slot-dot-booked" : "slot-dot-open"}`} />
-                {formatSlotTime(s.slot_time)}
-              </span>
-              <span className={`slot-label${s.is_booked ? " slot-label--booked" : ""}`}>
-                {s.is_booked ? "Booked" : "Available"}
+                <span className="slot-item-body">
+                  <span className="slot-item-time">{formatSlotTime(s.slot_time)}</span>
+                  {s.is_booked && s.patient_name && (
+                    <span className="slot-patient-info">
+                      <span className="slot-patient-name">{s.patient_name}</span>
+                      {s.reason && <span className="slot-patient-reason"> • {s.reason}</span>}
+                      <span className="slot-patient-meta">
+                        {s.patient_phone && (
+                          <span className="slot-patient-phone">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.7 12.5 19.79 19.79 0 0 1 1.64 3.89 2 2 0 0 1 3.61 2H6.5a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.5 9.59a16 16 0 0 0 6 6l.75-.75a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>
+                            </svg>
+                            {s.patient_phone}
+                          </span>
+                        )}
+                        {s.appointment_id && (
+                          <span className="slot-confirmation">{s.appointment_id}</span>
+                        )}
+                      </span>
+                    </span>
+                  )}
+                </span>
               </span>
               <span className="slot-action">
                 {s.is_booked ? "Unblock" : "Block"}
